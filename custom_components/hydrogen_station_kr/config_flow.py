@@ -12,6 +12,8 @@ class HydrogenStationKRConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input=None) -> FlowResult:
         errors = {}
         if user_input is not None:
+            # Here you might want to validate the API key and station name
+            # For now, we'll just create the entry
             return self.async_create_entry(
                 title=user_input[CONF_STATION_NAME],
                 data=user_input
