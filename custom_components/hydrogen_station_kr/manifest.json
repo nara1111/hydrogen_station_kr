@@ -1,6 +1,6 @@
 {
   "domain": "hydrogen_station_kr",
-  "name": "Hydrogen Station KR",
+  "name": "[KR] Hydrogen Station KR",
   "documentation": "https://github.com/nara1111/hydrogen_station_kr",
   "requirements": ["requests"],
   "ssdp": [],
