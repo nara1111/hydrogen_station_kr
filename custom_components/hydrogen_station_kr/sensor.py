@@ -39,22 +39,31 @@ class HydrogenStationKRSensor(SensorEntity):
         # 실시간 정보 조회
         response = requests.get("http://el.h2nbiz.or.kr/api/chrstnList/currentInfo", headers=headers)
         current_info = next((station for station in response.json() if station["chrstn_nm"] == self._station_name), None)
-
+    
         # 운영 정보 조회
         response = requests.get("http://el.h2nbiz.or.kr/api/chrstnList/operationInfo", headers=headers)
         operation_info = next((station for station in response.json() if station["chrstn_nm"] == self._station_name), None)
-
+    
         if current_info and operation_info:
             self._state = current_info["oper_sttus_nm"]
+            
+            # 영업 시간 정보 추출
+            business_hours = {}
+            days = ['mon', 'tues', 'wed', 'thur', 'fri', 'sat', 'sun', 'hldy']
+            for day in days:
+                start = operation_info.get(f"usebhr_hr_{day}", "정보 없음")
+                end = operation_info.get(f"useehr_hr_{day}", "정보 없음")
+                business_hours[f"{day}_hours"] = f"{start} - {end}" if start != "정보 없음" and end != "정보 없음" else "정보 없음"
+    
             self._attributes = {
                 "대기차량수": current_info["wait_vhcle_alge"],
                 "혼잡상태": current_info["cnf_sttus_nm"],
                 "운영상태갱신일자": current_info["last_mdfcn_dt"],
-                "판매가격": operation_info["ntsl_pc"],
-                "이용가능요일": operation_info["use_posbl_dotw"],
-                "영업시작시간": operation_info["usebhr_hr_mon"],
-                "영업종료시간": operation_info["useehr_hr_mon"],
-                "예약가능여부": "가능" if operation_info["rsvt_posbl_yn"] == "Y" else "불가능"
+                "판매가격": operation_info.get("ntsl_pc", "정보 없음"),
+                "이용가능요일": operation_info.get("use_posbl_dotw", "정보 없음"),
+                "예약가능여부": "가능" if operation_info.get("rsvt_posbl_yn") == "Y" else "불가능",
+                "휴식시간": f"{operation_info.get('rest_bgng_hr', '정보 없음')} - {operation_info.get('rest_end_hr', '정보 없음')}",
+                **business_hours
             }
         else:
             self._state = "Unknown"
