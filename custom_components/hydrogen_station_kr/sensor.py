@@ -55,12 +55,18 @@ class HydrogenStationKRSensor(SensorEntity):
                 end = operation_info.get(f"useehr_hr_{day}", "정보 없음")
                 business_hours[f"{day}_hours"] = f"{start} - {end}" if start != "정보 없음" and end != "정보 없음" else "정보 없음"
     
+            # 이용 가능 요일 정보 변환
+            use_posbl_dotw = operation_info.get("use_posbl_dotw", "")
+            day_names = ["월", "화", "수", "목", "금", "토", "일", "공휴일"]
+            closed_days = [day for day, is_open in zip(day_names, use_posbl_dotw) if is_open == '0']
+            closed_days_str = "휴무 없음" if not closed_days else f"{', '.join(closed_days)} 휴무"
+    
             self._attributes = {
                 "대기차량수": current_info["wait_vhcle_alge"],
                 "혼잡상태": current_info["cnf_sttus_nm"],
                 "운영상태갱신일자": current_info["last_mdfcn_dt"],
                 "판매가격": operation_info.get("ntsl_pc", "정보 없음"),
-                "이용가능요일": operation_info.get("use_posbl_dotw", "정보 없음"),
+                "이용가능요일": closed_days_str,
                 "예약가능여부": "가능" if operation_info.get("rsvt_posbl_yn") == "Y" else "불가능",
                 "휴식시간": f"{operation_info.get('rest_bgng_hr', '정보 없음')} - {operation_info.get('rest_end_hr', '정보 없음')}",
                 **business_hours
