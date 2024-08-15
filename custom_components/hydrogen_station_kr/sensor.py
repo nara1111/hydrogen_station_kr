@@ -11,7 +11,7 @@ from .const import DOMAIN, CONF_STATION_NAME, CONF_API_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
-SCAN_INTERVAL = timedelta(minutes=5)
+SCAN_INTERVAL = timedelta(minutes=2)
 
 async def async_setup_entry(
     hass: HomeAssistant,
