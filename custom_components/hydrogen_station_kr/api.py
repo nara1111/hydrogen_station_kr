@@ -74,7 +74,8 @@ class HydrogenStationAPI:
             state = oper_sttus_nm
 
         attributes = {
-            "chrstn_mno": current_info["chrstn_mno"],
+            "충전소명": current_info["chrstn_nm"],
+            "충전소관리번호": current_info["chrstn_mno"],
             "운영상태": oper_sttus_nm,
             "POS상태": pos_sttus_nm,
             "대기차량수": current_info["wait_vhcle_alge"],
