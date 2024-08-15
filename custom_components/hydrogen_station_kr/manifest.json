@@ -2,7 +2,7 @@
   "domain": "hydrogen_station_kr",
   "name": "[KR] Hydrogen Station KR",
   "documentation": "https://github.com/nara1111/hydrogen_station_kr",
-  "requirements": ["requests"],
+  "requirements": ["requests==2.25.1", "async_timeout==3.0.1"],
   "config_flow": true,
   "ssdp": [],
   "zeroconf": [],
