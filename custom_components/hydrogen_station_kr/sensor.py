@@ -70,6 +70,7 @@ class HydrogenStationCoordinator(DataUpdateCoordinator):
             return {
                 "state": state,
                 "attributes": {
+                    "chrstn_mno": current_info["chrstn_mno"],  # chrstn_mno 추가
                     "POS상태": pos_sttus_nm,
                     "대기차량수": current_info["wait_vhcle_alge"],
                     "혼잡상태": current_info["cnf_sttus_nm"],
@@ -88,8 +89,12 @@ class HydrogenStationCoordinator(DataUpdateCoordinator):
 class HydrogenStationKRSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator):
         super().__init__(coordinator)
-        self._attr_name = f"Hydrogen Station KR {coordinator.station_name}"
         self._attr_unique_id = f"hydrogen_station_kr_{coordinator.station_name}"
+
+    @property
+    def name(self):
+        chrstn_mno = self.coordinator.data["attributes"].get("chrstn_mno", "Unknown")
+        return f"Hydrogen Station {chrstn_mno}"
 
     @property
     def state(self):
