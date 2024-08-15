@@ -13,6 +13,17 @@ from .const import DOMAIN, CONF_STATION_NAME, CONF_API_KEY
 
 _LOGGER = logging.getLogger(__name__)
 
+async def async_setup_entry(
+    hass: HomeAssistant,
+    config_entry: ConfigEntry,
+    async_add_entities: AddEntitiesCallback,
+) -> None:
+    station_name = config_entry.data[CONF_STATION_NAME]
+    api_key = config_entry.data[CONF_API_KEY]
+    coordinator = HydrogenStationCoordinator(hass, station_name, api_key)
+    await coordinator.async_config_entry_first_refresh()
+    async_add_entities([HydrogenStationKRSensor(coordinator)], True)
+
 class HydrogenStationCoordinator(DataUpdateCoordinator):
     def __init__(self, hass, station_name, api_key):
         super().__init__(
