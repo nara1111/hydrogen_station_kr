@@ -1,4 +1,3 @@
-from datetime import timedelta
 import logging
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
@@ -7,11 +6,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, CoordinatorEntity
 
 from .const import DOMAIN, CONF_STATION_NAME, CONF_API_KEY
-from .api import HydrogenStationAPI
+from .api import HydrogenStationAPI, UPDATE_INTERVAL
 
 _LOGGER = logging.getLogger(__name__)
-
-UPDATE_INTERVAL = timedelta(minutes=5)
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -44,6 +41,7 @@ class HydrogenStationKRSensor(CoordinatorEntity, SensorEntity):
     def __init__(self, coordinator):
         super().__init__(coordinator)
         self._attr_unique_id = f"hydrogen_station_kr_{coordinator.api.station_name}"
+        self._attr_icon = "mdi:gas-station"
 
     @property
     def name(self):

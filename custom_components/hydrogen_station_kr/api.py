@@ -7,11 +7,13 @@ _LOGGER = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 RETRY_DELAY = 10
+UPDATE_INTERVAL = timedelta(minutes=5, seconds=10)
 
 class HydrogenStationAPI:
     def __init__(self, station_name, api_key):
         self.station_name = station_name
         self.api_key = api_key
+        self.base_url = "http://el.h2nbiz.or.kr/api/chrstnList"
 
     async def fetch_data(self):
         for attempt in range(MAX_RETRIES):
@@ -25,21 +27,29 @@ class HydrogenStationAPI:
                     _LOGGER.debug("Data update completed successfully")
                     return data
                 else:
-                    _LOGGER.error("Failed to fetch data from API")
-            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
-                _LOGGER.error(f"Error fetching data (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}")
-                if attempt < MAX_RETRIES - 1:
-                    await asyncio.sleep(RETRY_DELAY)
-                else:
-                    return {"state": "Unknown", "attributes": {}}
+                    _LOGGER.error("Failed to fetch data from API: Empty response")
+            except aiohttp.ClientError as e:
+                _LOGGER.error(f"Network error during API call (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}")
+            except asyncio.TimeoutError:
+                _LOGGER.error(f"Timeout during API call (attempt {attempt + 1}/{MAX_RETRIES})")
+            except Exception as e:
+                _LOGGER.error(f"Unexpected error during API call (attempt {attempt + 1}/{MAX_RETRIES}): {str(e)}")
+
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY)
+            else:
+                _LOGGER.error("Max retries reached. Unable to fetch data from API.")
+                return {"state": "Unknown", "attributes": {}}
 
     async def _fetch_current_info(self, session):
-        async with session.get("http://el.h2nbiz.or.kr/api/chrstnList/currentInfo", headers={"Authorization": self.api_key}, timeout=30) as response:
+        async with session.get(f"{self.base_url}/currentInfo", headers={"Authorization": self.api_key}, timeout=30) as response:
+            response.raise_for_status()
             data = await response.json()
             return next((station for station in data if station["chrstn_nm"] == self.station_name), None)
 
     async def _fetch_operation_info(self, session):
-        async with session.get("http://el.h2nbiz.or.kr/api/chrstnList/operationInfo", headers={"Authorization": self.api_key}, timeout=30) as response:
+        async with session.get(f"{self.base_url}/operationInfo", headers={"Authorization": self.api_key}, timeout=30) as response:
+            response.raise_for_status()
             data = await response.json()
             return next((station for station in data if station["chrstn_nm"] == self.station_name), None)
 
@@ -53,10 +63,10 @@ class HydrogenStationAPI:
         oper_sttus_nm = current_info["oper_sttus_nm"]
         cnf_sttus_nm = current_info["cnf_sttus_nm"]
 
-        is_business_hours = pos_sttus_nm == "운영중"
+        is_business_hours = oper_sttus_nm == "운영중"
 
         if is_business_hours:
-            if pos_sttus_nm in ["영업중지", "재고소진"]:
+            if pos_sttus_nm != "영업중":
                 state = pos_sttus_nm
             else:
                 state = cnf_sttus_nm
@@ -65,8 +75,8 @@ class HydrogenStationAPI:
 
         attributes = {
             "chrstn_mno": current_info["chrstn_mno"],
-            "POS상태": pos_sttus_nm,
             "운영상태": oper_sttus_nm,
+            "POS상태": pos_sttus_nm,
             "대기차량수": current_info["wait_vhcle_alge"],
             "혼잡상태": cnf_sttus_nm,
             "운영상태갱신일자": current_info["last_mdfcn_dt"],
