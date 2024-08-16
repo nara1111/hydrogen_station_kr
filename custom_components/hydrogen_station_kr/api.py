@@ -14,6 +14,7 @@ class HydrogenStationAPI:
         self.station_name = station_name
         self.api_key = api_key
         self.base_url = "http://el.h2nbiz.or.kr/api/chrstnList"
+        self.station_mno = None  # 초기화
 
     async def fetch_data(self):
         for attempt in range(MAX_RETRIES):
@@ -24,6 +25,9 @@ class HydrogenStationAPI:
 
                 if current_info and operation_info:
                     data = self._process_data(current_info, operation_info)
+                    # 성공적으로 데이터를 가져왔을 때 속성 업데이트
+                    self.station_name = current_info.get("chrstn_nm", self.station_name)
+                    self.station_mno = current_info.get("chrstn_mno", self.station_mno)
                     _LOGGER.debug("Data update completed successfully")
                     return data
                 else:
@@ -54,6 +58,9 @@ class HydrogenStationAPI:
             return next((station for station in data if station["chrstn_nm"] == self.station_name), None)
 
     def _process_data(self, current_info, operation_info):
+        self.station_name = current_info.get("chrstn_nm", "unknown")
+        self.station_mno = current_info.get("chrstn_mno", "unknown")
+
         use_posbl_dotw = operation_info.get("use_posbl_dotw", "")
         day_names = ["월", "화", "수", "목", "금", "토", "일", "공휴일"]
         closed_days = [day for day, is_open in zip(day_names, use_posbl_dotw) if is_open == '0']
@@ -74,7 +81,7 @@ class HydrogenStationAPI:
             state = oper_sttus_nm
 
         attributes = {
-            # "chrstn_nm": current_info["chrstn_nm"],
+            "chrstn_nm": current_info["chrstn_nm"],
             "chrstn_mno": current_info["chrstn_mno"],
             "운영상태": oper_sttus_nm,
             "POS상태": pos_sttus_nm,

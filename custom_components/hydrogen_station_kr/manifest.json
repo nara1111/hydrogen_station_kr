@@ -10,6 +10,6 @@
   "dependencies": [],
   "codeowners": ["@nara1111"],
   "iot_class": "cloud_polling",
-  "version": "v1.0.2-240816",
+  "version": "v1.1.0-240816",
   "issue_tracker": "https://github.com/nara1111/hydrogen_station_kr/issues"
 }
