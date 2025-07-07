@@ -1,15 +1,15 @@
 {
   "domain": "hydrogen_station_kr",
-  "name": "[KR] Hydrogen Station KR",
+  "name": "Hydrogen Station KR",
+  "version": "1.1.0",
   "documentation": "https://github.com/nara1111/hydrogen_station_kr",
-  "requirements": ["requests>=2.25.1,<3.0.0"],
+  "issue_tracker": "https://github.com/nara1111/hydrogen_station_kr/issues",
   "config_flow": true,
-  "ssdp": [],
-  "zeroconf": [],
-  "homekit": {},
-  "dependencies": [],
-  "codeowners": ["@nara1111"],
   "iot_class": "cloud_polling",
-  "version": "v1.1.0-240816",
-  "issue_tracker": "https://github.com/nara1111/hydrogen_station_kr/issues"
+  "requirements": [
+    "aiohttp>=3.8.0"
+  ],
+  "codeowners": [
+    "@nara1111"
+  ]
 }
