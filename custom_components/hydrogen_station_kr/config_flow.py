@@ -1,166 +1,110 @@
-# config_flow.py (최종 효율화 버전)
+# custom_components/hydrogen_station_kr/config_flow.py
 
 import logging
 from typing import Any
-import asyncio
-import aiohttp
-
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigEntry, OptionsFlow
+from homeassistant.core import callback
 from homeassistant.const import CONF_API_KEY
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
-from .const import (
-    DOMAIN,
-    CONF_STATION_NAME,
-    CONF_API_KEY,
-    CONF_ID_TYPE,
-    CONF_SEARCH_KEYWORD,
-    CONF_STATION_MNO,
-    ID_TYPE_KEYWORD,
-    ID_TYPE_MNO,
-)
+from .const import DOMAIN, CONF_STATION_MNO, KEY_CHRSTN_MNO, KEY_CHRSTN_NM
 from .api import HydrogenStationAPI
 
 _LOGGER = logging.getLogger(__name__)
 
-
 class HydrogenStationKRConfigFlow(ConfigFlow, domain=DOMAIN):
-    """Hydrogen Station KR config flow."""
-
     VERSION = 1
-    
-    def __init__(self):
-        """Initialize the config flow."""
-        self.api_key: str | None = None
-        self.found_stations: dict[str, str] = {} # {이름: 관리번호}
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Step 1: Ask the user to choose the registration method."""
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
+        if self._async_current_entries():
+            return self.async_abort(reason="single_instance_allowed")
         if user_input is not None:
-            id_type = user_input[CONF_ID_TYPE]
-            if id_type == ID_TYPE_KEYWORD:
-                return await self.async_step_search()
-            elif id_type == ID_TYPE_MNO:
-                return await self.async_step_mno()
-
+            return self.async_create_entry(title="수소 충전소", data=user_input)
         return self.async_show_form(
-            step_id="user",
-            data_schema=vol.Schema({
-                vol.Required(CONF_ID_TYPE, default=ID_TYPE_KEYWORD): vol.In({
-                    ID_TYPE_KEYWORD: "키워드로 검색하여 등록",
-                    ID_TYPE_MNO: "관리번호로 직접 등록"
-                })
-            }),
+            step_id="user", data_schema=vol.Schema({vol.Required(CONF_API_KEY): str})
         )
 
-    async def async_step_search(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle the flow for searching by keyword."""
+    @staticmethod
+    @callback
+    def async_get_options_flow(config_entry: ConfigEntry) -> OptionsFlow:
+        return HydrogenStationKROptionsFlow(config_entry)
+
+class HydrogenStationKROptionsFlow(OptionsFlow):
+    def __init__(self, config_entry: ConfigEntry):
+        self.config_entry = config_entry
+        self.found_stations: dict[str, str] = {}
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
+        station_list_str = "\n".join([f"- {s['name']}" for s in self.config_entry.options.get("stations", {}).values()])
+        return self.async_show_menu(
+            step_id="init",
+            menu_options=["add_station", "remove_station"],
+            description_placeholders={"stations": station_list_str or "없음"},
+        )
+
+    async def async_step_add_station(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
         errors: dict[str, str] = {}
         if user_input is not None:
-            keyword = user_input[CONF_SEARCH_KEYWORD]
-            self.api_key = user_input[CONF_API_KEY]
-            
+            keyword = user_input["keyword"]
+            api_key = self.config_entry.data[CONF_API_KEY]
             try:
                 session = async_get_clientsession(self.hass)
-                api = HydrogenStationAPI(station_name="", api_key=self.api_key)
+                api = HydrogenStationAPI(api_key=api_key)
                 all_stations = await api._fetch_api_data(session, "operationinfo")
-                if not all_stations:
-                    raise ConnectionError("Failed to fetch station list.")
-
-                self.found_stations = {
-                    s["chrstn_nm"]: s["chrstn_mno"]
-                    for s in all_stations if keyword in s.get("chrstn_nm", "")
-                }
                 
+                current_mno_list = [s["mno"] for s in self.config_entry.options.get("stations", {}).values()]
+                self.found_stations = {
+                    s[KEY_CHRSTN_MNO]: s[KEY_CHRSTN_NM]
+                    for s in all_stations
+                    if keyword in s.get(KEY_CHRSTN_NM, "") and s[KEY_CHRSTN_MNO] not in current_mno_list
+                }
                 if not self.found_stations:
                     errors["base"] = "no_stations_found"
-                elif len(self.found_stations) == 1:
-                    station_name = list(self.found_stations.keys())[0]
-                    station_mno = self.found_stations[station_name]
-                    return await self._create_entry(station_name, station_mно, self.api_key)
                 else:
-                    return await self.async_step_select()
-
-            except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError):
-                errors["base"] = "cannot_connect"
+                    return await self.async_step_select_station()
             except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
-
+                _LOGGER.exception("Failed to find stations")
+                errors["base"] = "cannot_connect"
         return self.async_show_form(
-            step_id="search",
-            data_schema=vol.Schema({
-                vol.Required(CONF_SEARCH_KEYWORD): str,
-                vol.Required(CONF_API_KEY): str,
-            }),
-            errors=errors,
+            step_id="add_station", data_schema=vol.Schema({vol.Required("keyword"): str}), errors=errors
         )
 
-    async def async_step_select(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle the flow for selecting from multiple search results."""
-        if user_input is not None:
-            station_name = user_input[CONF_STATION_NAME]
-            station_mno = self.found_stations[station_name]
-            return await self._create_entry(station_name, station_mno, self.api_key)
-            
-        return self.async_show_form(
-            step_id="select",
-            data_schema=vol.Schema(
-                {vol.Required(CONF_STATION_NAME): vol.In(list(self.found_stations.keys()))}
-            ),
-        )
-
-    async def async_step_mno(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle the flow for direct registration by MNO."""
-        errors: dict[str, str] = {}
+    async def async_step_select_station(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
         if user_input is not None:
             mno = user_input[CONF_STATION_MNO]
-            api_key = user_input[CONF_API_KEY]
-            try:
-                session = async_get_clientsession(self.hass)
-                api = HydrogenStationAPI(station_name="", api_key=api_key)
-                station_data = await api.async_find_station_by_identifier(session, "mno", mno)
-
-                if not station_data:
-                    raise ValueError("Station not found")
-                
-                station_name = station_data["chrstn_nm"]
-                return await self._create_entry(station_name, mno, api_key)
-                
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                errors["base"] = "cannot_connect"
-            except ValueError:
-                errors["base"] = "invalid_station"
-            except Exception:
-                _LOGGER.exception("Unexpected exception")
-                errors["base"] = "unknown"
+            name = self.found_stations[mno]
+            
+            new_options = self.config_entry.options.copy()
+            stations = new_options.get("stations", {}).copy()
+            stations[mno] = {"mno": mno, "name": name}
+            new_options["stations"] = stations
+            
+            return self.async_create_entry(title="", data=new_options)
 
         return self.async_show_form(
-            step_id="mno",
-            data_schema=vol.Schema({
-                vol.Required(CONF_STATION_MNO): str,
-                vol.Required(CONF_API_KEY): str,
-            }),
-            errors=errors,
+            step_id="select_station",
+            data_schema=vol.Schema({vol.Required(CONF_STATION_MNO): vol.In(self.found_stations)}),
         )
 
-    # --- 수정된 부분: 불필요한 API 재호출 제거 ---
-    async def _create_entry(self, station_name: str, station_mno: str, api_key: str) -> ConfigFlowResult:
-        """Create the config entry after validation."""
-        await self.async_set_unique_id(station_mno)
-        self._abort_if_unique_id_configured()
+    async def async_step_remove_station(self, user_input: dict[str, Any] | None = None) -> dict[str, Any]:
+        current_stations = self.config_entry.options.get("stations", {})
+        if not current_stations:
+            return self.async_abort(reason="no_stations_to_remove")
         
-        return self.async_create_entry(
-            title=station_name,
-            data={CONF_STATION_NAME: station_name, CONF_API_KEY: api_key},
+        if user_input is not None:
+            mno_to_remove = user_input["station_to_remove"]
+            
+            new_options = self.config_entry.options.copy()
+            stations = new_options.get("stations", {}).copy()
+            if mno_to_remove in stations:
+                del stations[mno_to_remove]
+                new_options["stations"] = stations
+            
+            return self.async_create_entry(title="", data=new_options)
+        
+        station_choices = {mno: f"{s['name']} ({mno})" for mno, s in current_stations.items()}
+        return self.async_show_form(
+            step_id="remove_station",
+            data_schema=vol.Schema({vol.Required("station_to_remove"): vol.In(station_choices)}),
         )
-    # --- 수정 끝 ---

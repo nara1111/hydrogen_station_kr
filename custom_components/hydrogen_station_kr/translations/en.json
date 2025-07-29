@@ -2,21 +2,56 @@
     "config": {
         "step": {
             "user": {
-                "title": "Hydrogen Station in South Korea Setup",
-                "description": "Set up your hydrogen station information",
+                "title": "Hydrogen Station KR Setup",
+                "description": "Enter your API Key issued by h2nbiz (Hydrogen Gas Information System).",
                 "data": {
-                    "station_name": "Station Name",
                     "api_key": "API Key"
                 }
             }
         },
+        "abort": {
+            "single_instance_allowed": "Already configured. Only one API key can be registered."
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "Manage Stations",
+                "description": "Currently registered stations:\n{stations}",
+                "menu_options": {
+                    "add_station": "Add a new station",
+                    "remove_station": "Remove a registered station"
+                }
+            },
+            "add_station": {
+                "title": "Add a new station",
+                "description": "Enter a part of the station name to search for.",
+                "data": {
+                    "keyword": "Search Keyword"
+                }
+            },
+            "select_station": {
+                "title": "Select Found Station",
+                "description": "Select a station to add from the list.",
+                "data": {
+                    "station_mno": "Station"
+                }
+            },
+            "remove_station": {
+                "title": "Remove a registered station",
+                "description": "Select a station to remove from the list.",
+                "data": {
+                    "station_to_remove": "Station to remove"
+                }
+            }
+        },
         "error": {
-            "cannot_connect": "Failed to connect",
-            "invalid_auth": "Invalid authentication",
-            "unknown": "Unexpected error"
+            "no_stations_found": "No stations found matching the keyword, or they are all already registered.",
+            "cannot_connect": "Failed to connect to the API server.",
+            "unknown": "An unknown error occurred."
         },
         "abort": {
-            "already_configured": "This station is already configured"
+            "no_stations_to_remove": "There are no stations to remove."
         }
     }
 }
